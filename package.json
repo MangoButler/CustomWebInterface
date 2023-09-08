@@ -1,0 +1,13 @@
+{
+  "dependencies": {
+    "axios": "^1.5.0",
+    "json-server": "^0.17.3"
+  },
+  "scripts": {
+    "start:db": "npx json-server --watch db.json",
+    "start:parcel": "npx parcel index.html"
+  },
+  "devDependencies": {
+    "buffer": "^6.0.3"
+  }
+}
