@@ -574,35 +574,68 @@ function hmrAccept(bundle /*: ParcelRequire */ , id /*: string */ ) {
 }
 
 },{}],"h7u1C":[function(require,module,exports) {
+var _collection = require("./models/Collection");
+var _userlist = require("./views/Userlist");
 var _user = require("./models/User");
-const user = (0, _user.User).buildUser({
-    id: 4
+const users = new (0, _collection.Collection)("http://localhost:3000/users", (json)=>{
+    return (0, _user.User).buildUser(json);
 });
-user.on("change", ()=>{
-    console.log(user);
+users.on("change", ()=>{
+    const root = document.getElementById("root");
+    if (root) new (0, _userlist.UserList)(root, users).render();
 });
-user.fetch();
-console.log(user.isAdminUser());
+users.fetch(); // const collection = User.buildUserCollection();
+ // collection.on('change', () => {
+ //   console.log(collection);
+ // });
+ // collection.fetch();
+ // const user = User.buildUser({ age: 20, name: 'James' });
+ // const root = document.getElementById('root');
+ // if (root) {
+ //   const userForm = new UserForm(root, user);
+ //   userForm.render();
+ // } else {
+ //   throw new Error('No roote element found!');
+ // }
+ // const user = User.buildUser({ age: 20, name: 'James' });
+ // const root = document.getElementById('root');
+ // if (root) {
+ //   const userEdit = new UserEdit(root, user);
+ //   userEdit.render();
+ //   console.log(userEdit);
+ // }
 
-},{"./models/User":"4rcHn"}],"4rcHn":[function(require,module,exports) {
+},{"./models/Collection":"dD11O","./views/Userlist":"156Jv","./models/User":"4rcHn"}],"dD11O":[function(require,module,exports) {
 var parcelHelpers = require("@parcel/transformer-js/src/esmodule-helpers.js");
 parcelHelpers.defineInteropFlag(exports);
-parcelHelpers.export(exports, "User", ()=>User);
-var _model = require("./Model");
-var _attributes = require("./Attributes");
-var _apiSync = require("./ApiSync");
+parcelHelpers.export(exports, "Collection", ()=>Collection);
 var _eventing = require("./Eventing");
-const rootUrl = "http://localhost:3000/users";
-class User extends (0, _model.Model) {
-    static buildUser(attrs) {
-        return new User(new (0, _attributes.Attributes)(attrs), new (0, _eventing.Eventing)(), new (0, _apiSync.ApiSync)(rootUrl));
+var _axios = require("axios");
+var _axiosDefault = parcelHelpers.interopDefault(_axios);
+class Collection {
+    constructor(rootUrl, deserialize){
+        this.rootUrl = rootUrl;
+        this.deserialize = deserialize;
+        this.models = [];
+        this.events = new (0, _eventing.Eventing)();
     }
-    isAdminUser() {
-        return this.get("id") === 1;
+    get on() {
+        return this.events.on;
+    }
+    get trigger() {
+        return this.events.trigger;
+    }
+    fetch() {
+        (0, _axiosDefault.default).get(this.rootUrl).then((response)=>{
+            response.data.forEach((value)=>{
+                this.models.push(this.deserialize(value));
+            });
+            this.trigger("change");
+        });
     }
 }
 
-},{"./Eventing":"7459s","@parcel/transformer-js/src/esmodule-helpers.js":"iCSPM","./Attributes":"6Bbds","./Model":"f033k","./ApiSync":"3wylh"}],"7459s":[function(require,module,exports) {
+},{"./Eventing":"7459s","axios":"jo6P5","@parcel/transformer-js/src/esmodule-helpers.js":"iCSPM"}],"7459s":[function(require,module,exports) {
 var parcelHelpers = require("@parcel/transformer-js/src/esmodule-helpers.js");
 parcelHelpers.defineInteropFlag(exports);
 parcelHelpers.export(exports, "Eventing", ()=>Eventing) //always use arrow functions inside classes to make sure that the this value always references the right object
@@ -655,99 +688,7 @@ exports.export = function(dest, destName, get) {
     });
 };
 
-},{}],"6Bbds":[function(require,module,exports) {
-var parcelHelpers = require("@parcel/transformer-js/src/esmodule-helpers.js");
-parcelHelpers.defineInteropFlag(exports);
-parcelHelpers.export(exports, "Attributes", ()=>Attributes) // you can create a type out of a string
- // type BestName = 'James'
- // all keys on Objects in js are strings even if put as a number
- //thus the key of an object can be a type as well
- //basically what wee are doing with the K constraint we are saying that the only possible types of K are the Keys of the T generic
- // so if we put in a type of UserProps into the T generic then K can only be a string that is either called name, age or id
- // the return type T[K] means that the type the the get function returns must be whatever the type of T is for the value of the K key
- // const attr = new Attributes<UserProps>({
- //   age: 22,
- //   name: 'james',
- //   id: 5
- // })
- // const id = attr.get('id');
- // const name = attr.get('name');
- // const age = attr.get('age');
-;
-class Attributes {
-    constructor(data){
-        this.data = data;
-        this.get = (key)=>{
-            return this.data[key];
-        };
-    }
-    set(update) {
-        Object.assign(this.data, update);
-    }
-    getAll() {
-        return this.data;
-    }
-}
-
-},{"@parcel/transformer-js/src/esmodule-helpers.js":"iCSPM"}],"f033k":[function(require,module,exports) {
-var parcelHelpers = require("@parcel/transformer-js/src/esmodule-helpers.js");
-parcelHelpers.defineInteropFlag(exports);
-parcelHelpers.export(exports, "Model", ()=>Model);
-class Model {
-    constructor(attributes, events, sync){
-        this.attributes = attributes;
-        this.events = events;
-        this.sync = sync;
-        this.on = this.events.on;
-        this.trigger = this.events.trigger;
-        this.get = this.attributes.get;
-    }
-    set(update) {
-        this.attributes.set(update);
-        this.events.trigger("change");
-    }
-    fetch() {
-        const id = this.attributes.get("id");
-        if (typeof id !== "number") throw new Error("Cannot fetch unsaved user!");
-        this.sync.fetch(id).then((response)=>{
-            this.set(response.data); //here we are calling the method set of the user to not skip the change event trigger
-        });
-    }
-    save() {
-        this.sync.save(this.attributes.getAll()).then((response)=>{
-            this.trigger("save");
-        }).catch((err)=>{
-            this.trigger("error");
-        });
-    }
-}
-
-},{"@parcel/transformer-js/src/esmodule-helpers.js":"iCSPM"}],"3wylh":[function(require,module,exports) {
-var parcelHelpers = require("@parcel/transformer-js/src/esmodule-helpers.js");
-parcelHelpers.defineInteropFlag(exports);
-parcelHelpers.export(exports, "ApiSync", ()=>ApiSync) //The sync class is much harder to implement than the Eventing class, as the user not only depends on the sync class, but the sync class itself needs access to information from the user to work properly
- //Serialize: convert data from an object to a saveable format (like json)
- //Deserialize put data in an object using some pre saved data like json
- // http://localhost:3000/users
-;
-var _axios = require("axios");
-var _axiosDefault = parcelHelpers.interopDefault(_axios);
-class ApiSync {
-    //This is a generic constraint, it lets Type Script know that the T generic provided will be implementing the HasId interface
-    constructor(rootUrl){
-        this.rootUrl = rootUrl;
-    }
-    fetch(id) {
-        return (0, _axiosDefault.default).get(`${this.rootUrl}/${id}`);
-    }
-    save(data) {
-        const { id } = data;
-        if (id) return (0, _axiosDefault.default).put(`${this.rootUrl}/${id}`, data);
-        else return (0, _axiosDefault.default).post(this.rootUrl, data);
-    }
-}
-
-},{"axios":"jo6P5","@parcel/transformer-js/src/esmodule-helpers.js":"iCSPM"}],"jo6P5":[function(require,module,exports) {
+},{}],"jo6P5":[function(require,module,exports) {
 var parcelHelpers = require("@parcel/transformer-js/src/esmodule-helpers.js");
 parcelHelpers.defineInteropFlag(exports);
 parcelHelpers.export(exports, "default", ()=>(0, _axiosJsDefault.default));
@@ -5076,6 +5017,268 @@ Object.entries(HttpStatusCode).forEach(([key, value])=>{
 });
 exports.default = HttpStatusCode;
 
-},{"@parcel/transformer-js/src/esmodule-helpers.js":"iCSPM"}]},["5J7ar","h7u1C"], "h7u1C", "parcelRequire94c2")
+},{"@parcel/transformer-js/src/esmodule-helpers.js":"iCSPM"}],"156Jv":[function(require,module,exports) {
+var parcelHelpers = require("@parcel/transformer-js/src/esmodule-helpers.js");
+parcelHelpers.defineInteropFlag(exports);
+parcelHelpers.export(exports, "UserList", ()=>UserList) // export class UserList extends CollectionView<User, UserProps> {
+ //   itemParentTemplate(): string {
+ //     return `ul:<ul></ul>`;
+ //   }
+ //   template(model: User): string {
+ //     return `
+ //     <li>
+ //     <p>Name: ${model.get('name')}</p>
+ //     <p>Age: ${model.get('age')}</p>
+ //     <hr/>
+ //     </li>
+ //     `;
+ //   }
+ //   renderItem(model: User, itemParent: Element): void {
+ //     const templateElement = document.createElement('template');
+ //     templateElement.innerHTML = this.template(model);
+ //     itemParent.append(templateElement.content);
+ //   }
+ // }
+;
+var _collectionView = require("./CollectionView");
+var _userShow = require("./UserShow");
+class UserList extends (0, _collectionView.CollectionView) {
+    renderItem(model, itemParent) {
+        new (0, _userShow.UserShow)(itemParent, model).render();
+    }
+}
+
+},{"./CollectionView":"4BOou","./UserShow":"2Tlyi","@parcel/transformer-js/src/esmodule-helpers.js":"iCSPM"}],"4BOou":[function(require,module,exports) {
+var parcelHelpers = require("@parcel/transformer-js/src/esmodule-helpers.js");
+parcelHelpers.defineInteropFlag(exports);
+parcelHelpers.export(exports, "CollectionView", ()=>CollectionView) // export abstract class CollectionView<T extends Model<K>, K extends HasId> {
+ //   constructor(public collection: Collection<T, K>, public parent: Element) {}
+ //   itemParentTemplate(): string {
+ //     return `div:<div></div>`;
+ //   }
+ //   abstract renderItem(model: T, itemParent: Element): void;
+ //   render(): void {
+ //     const templateElement = document.createElement('template');
+ //     const selector = this.itemParentTemplate().split(':')[0];
+ //     const element = this.itemParentTemplate().split(':')[1];
+ //     templateElement.innerHTML = element;
+ //     const itemParent = templateElement.content.querySelector(`${selector}`);
+ //     if (itemParent) {
+ //       this.collection.models.forEach((item) => {
+ //         this.renderItem(item, itemParent);
+ //       });
+ //       this.parent.append(itemParent);
+ //     }
+ //   }
+ // }
+;
+class CollectionView {
+    constructor(parent, collection){
+        this.parent = parent;
+        this.collection = collection;
+    }
+    render() {
+        this.parent.innerHTML = "";
+        const templateElement = document.createElement("template");
+        for (let model of this.collection.models){
+            const itemParent = document.createElement("div");
+            this.renderItem(model, itemParent);
+            templateElement.content.append(itemParent);
+        }
+        this.parent.append(templateElement.content);
+    }
+}
+
+},{"@parcel/transformer-js/src/esmodule-helpers.js":"iCSPM"}],"2Tlyi":[function(require,module,exports) {
+var parcelHelpers = require("@parcel/transformer-js/src/esmodule-helpers.js");
+parcelHelpers.defineInteropFlag(exports);
+parcelHelpers.export(exports, "UserShow", ()=>UserShow);
+var _view = require("./View");
+class UserShow extends (0, _view.View) {
+    template() {
+        return `
+    <div>
+    <h1>User Detail</h1>
+    <div>Name: ${this.model.get("name")}</div>
+    <div>Age: ${this.model.get("age")}</div>
+    </div>
+    `;
+    }
+}
+
+},{"./View":"5Vo78","@parcel/transformer-js/src/esmodule-helpers.js":"iCSPM"}],"5Vo78":[function(require,module,exports) {
+var parcelHelpers = require("@parcel/transformer-js/src/esmodule-helpers.js");
+parcelHelpers.defineInteropFlag(exports);
+parcelHelpers.export(exports, "View", ()=>View);
+class View {
+    constructor(parent, model){
+        this.parent = parent;
+        this.model = model;
+        this.regions = {};
+        this.bindModel();
+    }
+    regionsMap() {
+        return {};
+    }
+    eventsMap() {
+        return {};
+    }
+    bindModel() {
+        this.model.on("change", ()=>{
+            this.render();
+        });
+    }
+    bindEvents(fragment) {
+        const eventsMap = this.eventsMap();
+        for(let eventKey in eventsMap){
+            const [eventName, selector] = eventKey.split(":");
+            fragment.querySelectorAll(selector).forEach((element)=>{
+                element.addEventListener(eventName, eventsMap[eventKey]);
+            });
+        }
+    }
+    mapRegions(fragment) {
+        const regionsMap = this.regionsMap();
+        for(let key in regionsMap){
+            const selector = regionsMap[key];
+            const element = fragment.querySelector(selector);
+            if (element) this.regions[key] = element;
+        }
+    }
+    onRender() {}
+    render() {
+        this.parent.innerHTML = "";
+        const templateElement = document.createElement("template");
+        templateElement.innerHTML = this.template();
+        this.bindEvents(templateElement.content);
+        this.mapRegions(templateElement.content);
+        this.onRender();
+        this.parent.append(templateElement.content);
+    }
+}
+
+},{"@parcel/transformer-js/src/esmodule-helpers.js":"iCSPM"}],"4rcHn":[function(require,module,exports) {
+var parcelHelpers = require("@parcel/transformer-js/src/esmodule-helpers.js");
+parcelHelpers.defineInteropFlag(exports);
+parcelHelpers.export(exports, "User", ()=>User);
+var _model = require("./Model");
+var _attributes = require("./Attributes");
+var _apiSync = require("./ApiSync");
+var _eventing = require("./Eventing");
+var _collection = require("./Collection");
+const rootUrl = "http://localhost:3000/users";
+class User extends (0, _model.Model) {
+    static buildUser(attrs) {
+        return new User(new (0, _attributes.Attributes)(attrs), new (0, _eventing.Eventing)(), new (0, _apiSync.ApiSync)(rootUrl));
+    }
+    static buildUserCollection() {
+        return new (0, _collection.Collection)(rootUrl, (json)=>User.buildUser(json));
+    }
+    setRandomAge() {
+        const age = Math.round(Math.random() * 100);
+        this.set({
+            age
+        });
+    }
+    isAdminUser() {
+        return this.get("id") === 1;
+    }
+}
+
+},{"./Model":"f033k","./Attributes":"6Bbds","./ApiSync":"3wylh","./Eventing":"7459s","./Collection":"dD11O","@parcel/transformer-js/src/esmodule-helpers.js":"iCSPM"}],"f033k":[function(require,module,exports) {
+var parcelHelpers = require("@parcel/transformer-js/src/esmodule-helpers.js");
+parcelHelpers.defineInteropFlag(exports);
+parcelHelpers.export(exports, "Model", ()=>Model);
+class Model {
+    constructor(attributes, events, sync){
+        this.attributes = attributes;
+        this.events = events;
+        this.sync = sync;
+        this.on = this.events.on;
+        this.trigger = this.events.trigger;
+        this.get = this.attributes.get;
+    }
+    set(update) {
+        this.attributes.set(update);
+        this.events.trigger("change");
+    }
+    fetch() {
+        const id = this.attributes.get("id");
+        if (typeof id !== "number") throw new Error("Cannot fetch unsaved user!");
+        this.sync.fetch(id).then((response)=>{
+            this.set(response.data); //here we are calling the method set of the user to not skip the change event trigger
+        });
+    }
+    save() {
+        this.sync.save(this.attributes.getAll()).then((response)=>{
+            // console.log(response.data);
+            // this.set(response.data);
+            this.trigger("save");
+        }).catch((err)=>{
+            this.trigger("error");
+        });
+    }
+}
+
+},{"@parcel/transformer-js/src/esmodule-helpers.js":"iCSPM"}],"6Bbds":[function(require,module,exports) {
+var parcelHelpers = require("@parcel/transformer-js/src/esmodule-helpers.js");
+parcelHelpers.defineInteropFlag(exports);
+parcelHelpers.export(exports, "Attributes", ()=>Attributes) // you can create a type out of a string
+ // type BestName = 'James'
+ // all keys on Objects in js are strings even if put as a number
+ //thus the key of an object can be a type as well
+ //basically what wee are doing with the K constraint we are saying that the only possible types of K are the Keys of the T generic
+ // so if we put in a type of UserProps into the T generic then K can only be a string that is either called name, age or id
+ // the return type T[K] means that the type the the get function returns must be whatever the type of T is for the value of the K key
+ // const attr = new Attributes<UserProps>({
+ //   age: 22,
+ //   name: 'james',
+ //   id: 5
+ // })
+ // const id = attr.get('id');
+ // const name = attr.get('name');
+ // const age = attr.get('age');
+;
+class Attributes {
+    constructor(data){
+        this.data = data;
+        this.get = (key)=>{
+            return this.data[key];
+        };
+    }
+    set(update) {
+        Object.assign(this.data, update);
+    }
+    getAll() {
+        return this.data;
+    }
+}
+
+},{"@parcel/transformer-js/src/esmodule-helpers.js":"iCSPM"}],"3wylh":[function(require,module,exports) {
+var parcelHelpers = require("@parcel/transformer-js/src/esmodule-helpers.js");
+parcelHelpers.defineInteropFlag(exports);
+parcelHelpers.export(exports, "ApiSync", ()=>ApiSync) //The sync class is much harder to implement than the Eventing class, as the user not only depends on the sync class, but the sync class itself needs access to information from the user to work properly
+ //Serialize: convert data from an object to a saveable format (like json)
+ //Deserialize put data in an object using some pre saved data like json
+ // http://localhost:3000/users
+;
+var _axios = require("axios");
+var _axiosDefault = parcelHelpers.interopDefault(_axios);
+class ApiSync {
+    //This is a generic constraint, it lets Type Script know that the T generic provided will be implementing the HasId interface
+    constructor(rootUrl){
+        this.rootUrl = rootUrl;
+    }
+    fetch(id) {
+        return (0, _axiosDefault.default).get(`${this.rootUrl}/${id}`);
+    }
+    save(data) {
+        const { id } = data;
+        if (id) return (0, _axiosDefault.default).put(`${this.rootUrl}/${id}`, data);
+        else return (0, _axiosDefault.default).post(this.rootUrl, data);
+    }
+}
+
+},{"axios":"jo6P5","@parcel/transformer-js/src/esmodule-helpers.js":"iCSPM"}]},["5J7ar","h7u1C"], "h7u1C", "parcelRequire94c2")
 
 //# sourceMappingURL=index.b71e74eb.js.map
